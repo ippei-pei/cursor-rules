@@ -174,10 +174,11 @@ async function loadLatestHintContent(metricsDir: string): Promise<{ content: str
 
 export default async function Home() {
   // プロジェクトルートからの相対パス
-  const rulesDir = path.join(process.cwd(), ".cursor", "rules");
-  const metricsDir = path.join(process.cwd(), "metrics");
+  const contentDir = path.join(process.cwd(), "src", "content"); // コンテンツディレクトリのベースパス
+  const rulesDir = path.join(contentDir, "rules"); // ルールコンテンツディレクトリ
+  const metricsDir = path.join(contentDir, "metrics"); // メトリクスコンテンツディレクトリ
   const readmePath = path.join(rulesDir, "README.md");
-  const techStackPath = path.join(rulesDir, "010-tech-stack-always.mdc");
+  const techStackPath = path.join(rulesDir, "tech-stack.md"); // ファイル名を変更
 
   // 全メトリクスデータを読み込む
   const { dataByDate: allMetricsData, error: errorLoadingMetrics, latestFile: latestMetricsFile } = await loadAllMetricsData(metricsDir);
@@ -219,7 +220,7 @@ export default async function Home() {
       </Card>
 
       <Card className="mb-4">
-        <Card.Header>技術スタックルール (010-tech-stack-always.mdc)</Card.Header>
+        <Card.Header>技術スタックルール (tech-stack.md)</Card.Header>
         <Card.Body>
           {techStackResult.error ? (
             <p className="text-danger">{techStackResult.error}</p>
@@ -317,9 +318,9 @@ export default async function Home() {
           <p>
             <a
               href="https://github.com/your-username/your-repo-name"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            target="_blank"
+            rel="noopener noreferrer"
+          >
               GitHub リポジトリ
             </a>
           </p>
@@ -327,9 +328,9 @@ export default async function Home() {
           <p>
             <a
               href="https://github.com/your-username/your-repo-name/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+          target="_blank"
+          rel="noopener noreferrer"
+        >
               フィードバックはこちら (GitHub Issues)
             </a>
           </p>
