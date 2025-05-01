@@ -1,95 +1,342 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import fs from "fs/promises";
+import path from "path";
+import { marked } from "marked";
+import { Container, Card, Table } from "react-bootstrap";
+import MetricsChart from "@/components/MetricsChart"; // 作成したコンポーネントをインポート
 
-export default function Home() {
+// ファイルを読み込む非同期関数
+async function readFileContent(filePath: string): Promise<{ content: string; error?: string }> {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    return { content };
+  } catch (error) {
+    console.error(`Error reading ${path.basename(filePath)}:`, error);
+    return { content: "", error: `ファイルの読み込みに失敗しました: ${path.basename(filePath)}` };
+  }
+}
+
+// CSV文字列をパースする関数 (簡易版)
+function parseCsv(csvString: string): Record<string, string>[] {
+  const lines = csvString.trim().split('\n');
+  if (lines.length < 2) return []; // ヘッダーとデータ行が必要
+
+  const header = lines[0].split(',').map(h => h.trim());
+  const data = lines.slice(1).map(line => {
+    // ダブルクォート内のカンマを考慮 (簡易的な対応)
+    const values = line.split(/,(?=(?:(?:[^\"]*\"){2})*[^\"]*$)/);
+    const row: Record<string, string> = {};
+    header.forEach((key, index) => {
+      row[key] = values[index]?.trim().replace(/^"|"$/g, '') || ''; // 前後のダブルクォートを削除
+    });
+    return row;
+  });
+  return data;
+}
+
+// ファイル名から日付を抽出する関数 (YYYYMMDD形式を想定)
+function extractDateFromFilename(filename: string): string | null {
+  const match = filename.match(/metrics-(\d{8})\.csv/);
+  return match ? match[1] : null;
+}
+
+// 過去のメトリクスデータを読み込む関数
+async function loadAllMetricsData(metricsDir: string): Promise<{
+  dataByDate: Record<string, Record<string, string>[]>;
+  error?: string;
+  latestFile?: string;
+}> {
+  const dataByDate: Record<string, Record<string, string>[]> = {};
+  let latestFile: string | undefined = undefined;
+  let error: string | undefined = undefined;
+
+  try {
+    const files = await fs.readdir(metricsDir);
+    const csvFiles = files
+      .filter(file => file.startsWith("metrics-") && file.endsWith(".csv"))
+      .sort(); // 時系列順にソート
+
+    if (csvFiles.length === 0) {
+      return { dataByDate, error: "メトリクスファイルが見つかりません。" };
+    }
+
+    latestFile = csvFiles[csvFiles.length - 1]; // 最後が最新
+
+    for (const file of csvFiles) {
+      const date = extractDateFromFilename(file);
+      if (!date) continue; // 日付が抽出できなければスキップ
+
+      const filePath = path.join(metricsDir, file);
+      const fileResult = await readFileContent(filePath);
+
+      if (fileResult.error) {
+        // 個別ファイルのエラーはログに出力するが、全体のエラーとはしない
+        console.warn(`Warning reading ${file}: ${fileResult.error}`);
+        continue;
+      }
+      dataByDate[date] = parseCsv(fileResult.content);
+    }
+  } catch (err) {
+    console.error("Error accessing metrics directory:", err);
+    error = "メトリクスデータの読み込み中にエラーが発生しました。";
+  }
+
+  return { dataByDate, error, latestFile };
+}
+
+// 文字列から色を生成する簡易的な関数 (ハッシュベース)
+function stringToColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = '#';
+  for (let i = 0; i < 3; i++) {
+    const value = (hash >> (i * 8)) & 0xFF;
+    color += ('00' + value.toString(16)).substr(-2);
+  }
+  // 色が見やすいように少し調整 (例: 明るさを確保)
+  // より洗練された方法もありますが、ここではシンプルにします
+  const r = parseInt(color.substring(1, 3), 16);
+  const g = parseInt(color.substring(3, 5), 16);
+  const b = parseInt(color.substring(5, 7), 16);
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  if (brightness < 128) { // 暗すぎる場合は少し明るくする (例)
+     // 簡単な例: #808080 に近づける (より良い方法は検討可能)
+     return `#${(0x80 + Math.floor(r/2)).toString(16).padStart(2, '0')}${(0x80 + Math.floor(g/2)).toString(16).padStart(2, '0')}${(0x80 + Math.floor(b/2)).toString(16).padStart(2, '0')}`;
+  }
+  return color;
+}
+
+// allMetricsData を Recharts 用のデータ形式に変換する関数
+function transformDataForChart(dataByDate: Record<string, Record<string, string>[]>): {
+  chartData: { date: string; [ruleId: string]: number | string }[];
+  ruleIds: string[];
+} {
+  const chartData: { date: string; [ruleId: string]: number | string }[] = [];
+  const ruleIdSet = new Set<string>();
+
+  // 日付順にソートして処理
+  const sortedDates = Object.keys(dataByDate).sort();
+
+  for (const date of sortedDates) {
+    const dailyData = dataByDate[date];
+    const chartEntry: { date: string; [ruleId: string]: number | string } = { date };
+
+    for (const ruleData of dailyData) {
+      if (ruleData["Rule ID"] && ruleData["Score"]) {
+        const ruleId = ruleData["Rule ID"];
+        const score = parseInt(ruleData["Score"], 10);
+        if (!isNaN(score)) {
+          chartEntry[ruleId] = score;
+          ruleIdSet.add(ruleId);
+        }
+      }
+    }
+    chartData.push(chartEntry);
+  }
+
+  return { chartData, ruleIds: Array.from(ruleIdSet) };
+}
+
+// 最新のヒント Markdown ファイルを読み込む関数
+async function loadLatestHintContent(metricsDir: string): Promise<{ content: string; error?: string; filename?: string }> {
+  let filename: string | undefined = undefined;
+  let content: string = "";
+  let error: string | undefined = undefined;
+
+  try {
+    const files = await fs.readdir(metricsDir);
+    const hintFiles = files
+      .filter(file => file.startsWith("_hints-") && file.endsWith(".md"))
+      .sort()
+      .reverse(); // 最新ファイルを先頭に
+
+    if (hintFiles.length > 0) {
+      filename = hintFiles[0];
+      const hintFilePath = path.join(metricsDir, filename);
+      const hintResult = await readFileContent(hintFilePath);
+      if (hintResult.error) {
+        error = hintResult.error;
+      } else {
+        content = hintResult.content;
+      }
+    } else {
+      // ヒントファイルがなくてもエラーとはしない
+      content = "利用可能なヒントはありません。";
+    }
+  } catch (err) {
+    console.error("Error accessing metrics directory for hints:", err);
+    error = "ヒントファイルの読み込み中にエラーが発生しました。";
+  }
+
+  return { content, error, filename };
+}
+
+export default async function Home() {
+  // プロジェクトルートからの相対パス
+  const rulesDir = path.join(process.cwd(), ".cursor", "rules");
+  const metricsDir = path.join(process.cwd(), "metrics");
+  const readmePath = path.join(rulesDir, "README.md");
+  const techStackPath = path.join(rulesDir, "010-tech-stack-always.mdc");
+
+  // 全メトリクスデータを読み込む
+  const { dataByDate: allMetricsData, error: errorLoadingMetrics, latestFile: latestMetricsFile } = await loadAllMetricsData(metricsDir);
+
+  // 最新のメトリクスデータを取得 (存在すれば)
+  const latestMetricsData = latestMetricsFile && allMetricsData[extractDateFromFilename(latestMetricsFile) || '']
+    ? allMetricsData[extractDateFromFilename(latestMetricsFile) || '']
+    : [];
+
+  // グラフ用データ整形
+  const { chartData, ruleIds } = transformDataForChart(allMetricsData);
+  const chartLines = ruleIds.map(id => ({ key: id, color: stringToColor(id) }));
+
+  // ルールファイルと最新ヒントを並列読み込み
+  const [readmeResult, techStackResult, hintResult] = await Promise.all([
+    readFileContent(readmePath),
+    readFileContent(techStackPath),
+    loadLatestHintContent(metricsDir), // 最新ヒントを読み込む
+  ]);
+
+  // markedでMarkdownをHTMLに変換
+  const readmeHtml = marked(readmeResult.content);
+  const techStackHtml = marked(techStackResult.content);
+  const hintHtml = marked(hintResult.content); // ヒントもHTMLに変換
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <Container className="my-4">
+      <h1>Cursor Rule Metrics</h1>
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      <Card className="mb-4">
+        <Card.Header>ルールの概要 (README)</Card.Header>
+        <Card.Body>
+          {readmeResult.error ? (
+            <p className="text-danger">{readmeResult.error}</p>
+          ) : (
+            <div dangerouslySetInnerHTML={{ __html: readmeHtml }} />
+          )}
+        </Card.Body>
+      </Card>
+
+      <Card className="mb-4">
+        <Card.Header>技術スタックルール (010-tech-stack-always.mdc)</Card.Header>
+        <Card.Body>
+          {techStackResult.error ? (
+            <p className="text-danger">{techStackResult.error}</p>
+          ) : (
+            <div dangerouslySetInnerHTML={{ __html: techStackHtml }} />
+          )}
+        </Card.Body>
+      </Card>
+
+      {/* 最新メトリクスセクション */}
+      <Card className="mb-4">
+        <Card.Header>最新メトリクス ({latestMetricsFile || "N/A"})</Card.Header>
+        <Card.Body>
+          {errorLoadingMetrics ? (
+            <p className="text-danger">{errorLoadingMetrics}</p>
+          ) : (
+            latestMetricsData.length === 0 ? (
+              <p>表示するメトリクスデータがありません。</p>
+            ) : (
+              <Table striped bordered hover responsive size="sm">
+                <thead>
+                  <tr>
+                    {/* ヘッダー行: latestMetricsDataの最初の要素のキーを使用 */}
+                    {Object.keys(latestMetricsData[0]).map(key => (
+                      <th key={key}>{key}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* データ行: latestMetricsDataをマップして表示 */}
+                  {latestMetricsData.map((row, index) => (
+                    <tr key={index}>
+                      {Object.values(row).map((value, i) => (
+                        <td key={i}>{value}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )
+          )}
+        </Card.Body>
+      </Card>
+
+           {/* メトリクス推移グラフセクション (Task 2.1.2 で実装) */}
+           <Card className="mb-4">
+        <Card.Header>メトリクス推移</Card.Header>
+        <Card.Body>
+          {errorLoadingMetrics ? (
+            <p className="text-danger">{errorLoadingMetrics}</p>
+          ) : (
+            Object.keys(allMetricsData).length === 0 ? (
+              <p>グラフを表示するためのデータがありません。</p>
+            ) : (
+              <MetricsChart data={chartData} lines={chartLines} />
+            )
+          )}
+        </Card.Body>
+      </Card>
+
+      {/* スコア変動要因ヒントセクション */}
+      <Card className="mb-4">
+        <Card.Header>スコア変動要因ヒント ({hintResult.filename || "N/A"})</Card.Header>
+        <Card.Body>
+          {hintResult.error ? (
+            <p className="text-danger">{hintResult.error}</p>
+          ) : (
+            <div dangerouslySetInnerHTML={{ __html: hintHtml }} />
+          )}
+        </Card.Body>
+      </Card>
+
+      {/* 手動考察セクション */}
+      <Card className="mb-4">
+        <Card.Header>考察 (手動追記)</Card.Header>
+        <Card.Body>
+          <p>ここに手動での考察やコメントが追記されます。(TBD)</p>
+          <p><em>(編集機能は未実装です)</em></p>
+        </Card.Body>
+      </Card>
+
+      {/* 設計思想/全体像セクション */}
+      <Card className="mb-4">
+        <Card.Header>設計思想 / 全体像</Card.Header>
+        <Card.Body>
+          <p>ここにルールの設計思想や全体像に関する説明が入ります。(TBD)</p>
+        </Card.Body>
+      </Card>
+
+      {/* 関連リンク セクション */}
+      <Card className="mb-4">
+        <Card.Header>関連リンク</Card.Header>
+        <Card.Body>
+          {/* TODO: 正しいリポジトリ URL に置き換える */}
+          <p>
+            <a
+              href="https://github.com/your-username/your-repo-name"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub リポジトリ
+            </a>
+          </p>
+          {/* TODO: 正しい Issues URL に置き換える */}
+          <p>
+            <a
+              href="https://github.com/your-username/your-repo-name/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              フィードバックはこちら (GitHub Issues)
+            </a>
+          </p>
+        </Card.Body>
+      </Card>
+
+      {/* 他のセクションはここに追加していきます */}
+    </Container>
   );
 }

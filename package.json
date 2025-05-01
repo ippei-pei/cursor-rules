@@ -6,20 +6,36 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint --max-warnings 0 && prettier --check .",
+    "lint:fix": "next lint --fix && prettier --write .",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "echo 'Warning: Test runner not fully configured. Using placeholder.' && exit 0",
+    "test:e2e": "echo 'Warning: E2E tests not configured.' && exit 0",
+    "metrics:analyze": "node scripts/analyze-cursor-logs.js",
+    "metrics:integrity": "node scripts/check-rule-integrity.js",
+    "metrics:generate-hints": "node scripts/generate-hints.js",
+    "metrics:report": "npm run metrics:analyze && npm run metrics:integrity && npm run metrics:generate-hints && node scripts/generate-weekly-report.js"
   },
   "dependencies": {
+    "@types/marked": "^5.0.2",
+    "bootstrap": "^5.3.5",
+    "marked": "^15.0.11",
+    "next": "15.3.1",
     "react": "^19.0.0",
+    "react-bootstrap": "^2.10.9",
     "react-dom": "^19.0.0",
-    "next": "15.3.1"
+    "recharts": "^2.15.3"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.3.1",
-    "@eslint/eslintrc": "^3"
+    "eslint-config-prettier": "^9.1.0",
+    "glob": "^10.4.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5"
   }
 }

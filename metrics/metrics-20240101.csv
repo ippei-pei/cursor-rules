@@ -1,0 +1,4 @@
+Rule ID,Rule Name,Score,Details
+010-tech-stack-always,Tech Stack,95,"OK"
+030-quality-gate-always,Quality Gate,80,"Needs Improvement"
+032-lint-format-always,Lint & Format,100,"OK" 
