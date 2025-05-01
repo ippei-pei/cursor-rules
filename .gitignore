@@ -45,7 +45,6 @@ next-env.d.ts
 /docs/
 /plan.md
 /scripts/
-/.github/
 /.cursor/
 *.log
 /metrics/_*.json # Ignore intermediate JSON files
