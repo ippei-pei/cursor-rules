@@ -2,7 +2,14 @@ import fs from "fs/promises";
 import path from "path";
 import { marked } from "marked";
 import { Container, Card, Table } from "react-bootstrap";
-import MetricsChart from "@/components/MetricsChart"; // 作成したコンポーネントをインポート
+// import MetricsChart from "@/components/MetricsChart"; // 通常のインポートをコメントアウト
+import dynamic from 'next/dynamic'; // dynamic をインポート
+
+// MetricsChart をダイナミックインポート (SSR無効)
+const MetricsChart = dynamic(() => import('@/components/MetricsChart'), {
+  ssr: false,
+  loading: () => <p>グラフを読み込み中...</p> // ローディング表示を追加
+});
 
 // ファイルを読み込む非同期関数
 async function readFileContent(filePath: string): Promise<{ content: string; error?: string }> {
