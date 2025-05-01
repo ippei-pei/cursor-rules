@@ -2,14 +2,8 @@ import fs from "fs/promises";
 import path from "path";
 import { marked } from "marked";
 import { Container, Card, Table } from "react-bootstrap";
-// import MetricsChart from "@/components/MetricsChart"; // 通常のインポートをコメントアウト
-import dynamic from 'next/dynamic'; // dynamic をインポート
-
-// MetricsChart をダイナミックインポート (SSR無効)
-const MetricsChart = dynamic(() => import('@/components/MetricsChart'), {
-  ssr: false,
-  loading: () => <p>グラフを読み込み中...</p> // ローディング表示を追加
-});
+// import dynamic from 'next/dynamic'; // 不要になった dynamic インポートを削除
+import ChartLoader from "@/components/ChartLoader"; // 新しいローダーコンポーネントをインポート
 
 // ファイルを読み込む非同期関数
 async function readFileContent(filePath: string): Promise<{ content: string; error?: string }> {
@@ -282,7 +276,7 @@ export default async function Home() {
             Object.keys(allMetricsData).length === 0 ? (
               <p>グラフを表示するためのデータがありません。</p>
             ) : (
-              <MetricsChart data={chartData} lines={chartLines} />
+              <ChartLoader data={chartData} lines={chartLines} />
             )
           )}
         </Card.Body>

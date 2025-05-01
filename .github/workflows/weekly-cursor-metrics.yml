@@ -1,0 +1,93 @@
+name: Weekly Cursor Rule Metrics
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'   # 毎週月曜 12:00 JST（UTC 03:00）
+  workflow_dispatch:
+
+jobs:
+  analyze-and-report:
+    runs-on: ubuntu-latest
+    # Allow writing to the repository
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        # Fetch full history to allow git log for the past week
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - name: Analyze Cursor Usage Logs
+        id: analyze_logs # Give ID to potentially use output later
+        run: node scripts/analyze-cursor-logs.js
+
+      - name: Check Rule Integrity
+        id: check_integrity # Give ID to potentially use output later
+        run: node scripts/check-rule-integrity.js
+
+      # --- New Steps for Hints --- 
+      - name: Get Previous Week's Start Date
+        id: dates
+        run: echo "start_date=$(date -d 'last monday - 7 days' +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Get Commit History for Last Week
+        id: commits
+        run: |
+          echo "Getting commits since ${{ steps.dates.outputs.start_date }}..."
+          commits=$(git log --since="${{ steps.dates.outputs.start_date }}" --pretty=format:'- %h %s (%an)' --no-merges)
+          echo "COMMIT_LOG<<EOF" >> $GITHUB_ENV
+          echo "$commits" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Get Error Reports for Last Week
+        id: errors
+        run: |
+          echo "Getting error reports since ${{ steps.dates.outputs.start_date }}..."
+          mkdir -p docs/error-reports # Ensure dir exists
+          # Find files modified since start_date (approximation)
+          # A more robust way might involve checking filenames if they contain dates
+          report_files=$(find docs/error-reports -name '*.md' -newermt "${{ steps.dates.outputs.start_date }}" -print || echo "")
+          error_summary=""
+          if [ -n "$report_files" ]; then
+            for file in $report_files; do
+              title=$(head -n 1 "$file" | sed 's/# Error Report: //')
+              error_summary=$(printf "%s\n- %s (%s)" "$error_summary" "$title" "$file")
+            done
+          else
+             error_summary="-"
+          fi
+          echo "ERROR_REPORTS<<EOF" >> $GITHUB_ENV
+          echo "$error_summary" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Generate Variation Hints (Placeholder)
+        id: generate_hints # Give ID
+        run: node scripts/generate-hints.js # New script to create
+      # --- End New Steps ---
+
+      - name: Generate Weekly Metrics Report
+        # Pass hints file path to the report generator if needed
+        run: node scripts/generate-weekly-report.js # Might need modification
+
+      - name: Commit and Push Metrics
+        run: |
+          git config user.name "github-actions[bot]" # Standard bot name
+          git config user.email "github-actions[bot]@users.noreply.github.com" # Standard bot email
+          git add metrics/*.csv metrics/_hints*.md || true # Add hints file too
+          # Check if there are staged changes before committing
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore(metrics): weekly cursor report and hints"
+            git push || echo "Failed to push changes."
+          fi
+        # continue-on-error: true # Removed to catch potential push errors 
