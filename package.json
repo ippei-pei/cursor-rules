@@ -14,7 +14,8 @@
     "metrics:analyze": "node scripts/analyze-cursor-logs.js",
     "metrics:integrity": "node scripts/check-rule-integrity.js",
     "metrics:generate-hints": "node scripts/generate-hints.js",
-    "metrics:report": "npm run metrics:analyze && npm run metrics:integrity && npm run metrics:generate-hints && node scripts/generate-weekly-report.js"
+    "metrics:report": "npm run metrics:analyze && npm run metrics:integrity && npm run metrics:generate-hints && node scripts/generate-weekly-report.js",
+    "prepare": "husky install"
   },
   "dependencies": {
     "@types/marked": "^5.0.2",
@@ -36,6 +37,7 @@
     "eslint-config-prettier": "^9.1.0",
     "glob": "^10.4.0",
     "prettier": "^3.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "husky": "^8.0.0"
   }
 }
