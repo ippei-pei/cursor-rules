@@ -3,7 +3,6 @@ import path from "path";
 import { marked } from "marked";
 import { Container, Card, Table } from "react-bootstrap";
 // import dynamic from 'next/dynamic'; // 不要になった dynamic インポートを削除
-import ChartLoader from "@/components/ChartLoader"; // 新しいローダーコンポーネントをインポート
 
 // ファイルを読み込む非同期関数
 async function readFileContent(filePath: string): Promise<{ content: string; error?: string }> {
@@ -275,7 +274,8 @@ export default async function Home() {
           {errorLoadingMetrics ? (
             <p className="text-danger">{errorLoadingMetrics}</p>
           ) : chartData && chartData.length > 0 && chartLines && chartLines.length > 0 ? ( // Check data existence
-            <ChartLoader data={chartData} lines={chartLines} />
+            // <ChartLoader data={chartData} lines={chartLines} />
+            <p>テスト: グラフ表示箇所</p> // Replace ChartLoader with simple text
           ) : (
             <p>グラフを表示するためのデータがありません。</p>
           )}
