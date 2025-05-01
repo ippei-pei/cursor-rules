@@ -44,4 +44,6 @@ jobs:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_CURSOR_RULES_2F81C }}' # Updated secret name
           channelId: live # Deploy to the live channel
-          projectId: cursor-rules-2f81c # Updated project ID 
+          projectId: cursor-rules-2f81c # Updated project ID
+        env:
+          FIREBASE_CLI_EXPERIMENTS: webframeworks 
