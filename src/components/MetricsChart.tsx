@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 
 // Props の型定義 (後で page.tsx から渡すデータ構造に合わせる)
 interface MetricsChartProps {
-  data: any[]; // TODO: 型を具体的にする
+  data: { date: string; [ruleId: string]: number | string }[]; // any[] から具体的な型に変更
   lines: { key: string; color: string }[]; // TODO: 型を具体的にする
 }
 
