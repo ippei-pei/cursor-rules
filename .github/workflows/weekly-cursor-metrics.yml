@@ -2,7 +2,7 @@ name: Weekly Cursor Rule Metrics
 
 on:
   schedule:
-    - cron: '0 3 * * 1'   # 毎週月曜 12:00 JST（UTC 03:00）
+    - cron: "0 3 * * 1" # 毎週月曜 12:00 JST（UTC 03:00）
   workflow_dispatch:
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
         id: check_integrity # Give ID to potentially use output later
         run: node scripts/check-rule-integrity.js
 
-      # --- New Steps for Hints --- 
+      # --- New Steps for Hints ---
       - name: Get Previous Week's Start Date
         id: dates
         run: echo "start_date=$(date -d 'last monday - 7 days' +%Y-%m-%d)" >> $GITHUB_OUTPUT
@@ -90,4 +90,4 @@ jobs:
             git commit -m "chore(metrics): weekly cursor report and hints"
             git push || echo "Failed to push changes."
           fi
-        # continue-on-error: true # Removed to catch potential push errors 
+        # continue-on-error: true # Removed to catch potential push errors

@@ -1,7 +1,16 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import React from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 // Props の型定義 (後で page.tsx から渡すデータ構造に合わせる)
 interface MetricsChartProps {
@@ -27,17 +36,17 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data, lines }) => {
         }}
       >
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" /> {/* X軸は日付 */} 
+        <XAxis dataKey="date" /> {/* X軸は日付 */}
         <YAxis />
         <Tooltip />
         <Legend />
-        {/* lines 配列に基づいて Line コンポーネントを動的に生成 */} 
-        {lines.map(line => (
-          <Line 
+        {/* lines 配列に基づいて Line コンポーネントを動的に生成 */}
+        {lines.map((line) => (
+          <Line
             key={line.key}
-            type="monotone" 
+            type="monotone"
             dataKey={line.key} // Y軸の値のキー (Rule ID)
-            stroke={line.color} // 線の色 
+            stroke={line.color} // 線の色
             activeDot={{ r: 8 }}
           />
         ))}
@@ -46,4 +55,4 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data, lines }) => {
   );
 };
 
-export default MetricsChart; 
+export default MetricsChart;

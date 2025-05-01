@@ -5,16 +5,16 @@ on:
     branches:
       - main
     paths:
-      - 'src/**'
-      - 'public/**'
-      - 'metrics/**'
-      - '.github/workflows/deploy.yml'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'next.config.mjs'
-      - 'tsconfig.json'
-      - 'firebase.json'
-      - '.firebaserc'
+      - "src/**"
+      - "public/**"
+      - "metrics/**"
+      - ".github/workflows/deploy.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.mjs"
+      - "tsconfig.json"
+      - "firebase.json"
+      - ".firebaserc"
   workflow_dispatch:
 
 jobs:
@@ -27,8 +27,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Use a Node.js version compatible with your project
-          cache: 'npm'
+          node-version: "20" # Use a Node.js version compatible with your project
+          cache: "npm"
 
       - name: List files in src/content/rules # Add this step for debugging
         run: ls -la src/content/rules/
@@ -36,17 +36,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build Next.js app (with static export)
+        run: npm run build
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
+          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_CURSOR_RULES_2F81C }}" # Updated secret name
+          channelId: live # Deploy to the live channel
+          projectId: cursor-rules-2f81c # Updated project ID
+
+
       # Build step is typically handled by Firebase Extended Integration
       # If you need custom build steps, add them here.
       # - name: Build Next.js app
       #   run: npm run build
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_CURSOR_RULES_2F81C }}' # Updated secret name
-          channelId: live # Deploy to the live channel
-          projectId: cursor-rules-2f81c # Updated project ID
-        env:
-          FIREBASE_CLI_EXPERIMENTS: webframeworks 
+      # Remove env section
+      # env:
+      #   FIREBASE_CLI_EXPERIMENTS: webframeworks

@@ -1,10 +1,13 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: true
 ---
+
 # Description: Defines the core technology stack for the project.
-# Globs: *
+
+# Globs: \*
+
 # AlwaysApply: true
 
 - **Runtime / Platform**

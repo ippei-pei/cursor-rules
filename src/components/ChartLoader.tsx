@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import React from 'react';
-import dynamic from 'next/dynamic';
+import React from "react";
+import dynamic from "next/dynamic";
 
 // MetricsChart をダイナミックインポート (SSR無効)
-const MetricsChart = dynamic(() => import('@/components/MetricsChart'), {
+const MetricsChart = dynamic(() => import("@/components/MetricsChart"), {
   ssr: false,
-  loading: () => <p>グラフを読み込み中...</p>
+  loading: () => <p>グラフを読み込み中...</p>,
 });
 
 // MetricsChart に渡す Props の型 (page.tsx から受け取る)
@@ -21,4 +21,4 @@ const ChartLoader: React.FC<ChartLoaderProps> = ({ data, lines }) => {
   return <MetricsChart data={data} lines={lines} />;
 };
 
-export default ChartLoader; 
+export default ChartLoader;

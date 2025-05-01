@@ -1,46 +1,50 @@
-import fs from "fs/promises";
+import fs from "fs/promises"; // Keep fs and path for data fetching
 import path from "path";
-import { marked } from "marked";
-import { Container, Card, Table } from "react-bootstrap";
-// import dynamic from 'next/dynamic'; // 不要になった dynamic インポートを削除
+import { marked } from "marked"; // Keep marked for preprocessing
+// Remove react-bootstrap imports
 
-// ファイルを読み込む非同期関数
-async function readFileContent(filePath: string): Promise<{ content: string; error?: string }> {
+// Import the new client component
+import PageContent from "@/components/PageContent";
+
+// Keep data fetching and processing functions
+async function readFileContent(
+  filePath: string,
+): Promise<{ content: string; error?: string }> {
   try {
     const content = await fs.readFile(filePath, "utf-8");
     return { content };
   } catch (error) {
     console.error(`Error reading ${path.basename(filePath)}:`, error);
-    return { content: "", error: `ファイルの読み込みに失敗しました: ${path.basename(filePath)}` };
+    return {
+      content: "",
+      error: `ファイルの読み込みに失敗しました: ${path.basename(filePath)}`,
+    };
   }
 }
 
-// CSV文字列をパースする関数 (簡易版)
 function parseCsv(csvString: string): Record<string, string>[] {
-  const lines = csvString.trim().split('\n');
-  if (lines.length < 2) return []; // ヘッダーとデータ行が必要
-
-  const header = lines[0].split(',').map(h => h.trim());
-  const data = lines.slice(1).map(line => {
-    // ダブルクォート内のカンマを考慮 (簡易的な対応)
+  const lines = csvString.trim().split("\n");
+  if (lines.length < 2) return [];
+  const header = lines[0].split(",").map((h) => h.trim());
+  const data = lines.slice(1).map((line) => {
     const values = line.split(/,(?=(?:(?:[^\"]*\"){2})*[^\"]*$)/);
     const row: Record<string, string> = {};
     header.forEach((key, index) => {
-      row[key] = values[index]?.trim().replace(/^"|"$/g, '') || ''; // 前後のダブルクォートを削除
+      row[key] = values[index]?.trim().replace(/^"|"$/g, "") || "";
     });
     return row;
   });
   return data;
 }
 
-// ファイル名から日付を抽出する関数 (YYYYMMDD形式を想定)
 function extractDateFromFilename(filename: string): string | null {
   const match = filename.match(/metrics-(\d{8})\.csv/);
   return match ? match[1] : null;
 }
 
-// 過去のメトリクスデータを読み込む関数
-async function loadAllMetricsData(metricsDir: string): Promise<{
+async function loadAllMetricsData(
+  metricsDir: string,
+): Promise<{
   dataByDate: Record<string, Record<string, string>[]>;
   error?: string;
   latestFile?: string;
@@ -48,28 +52,21 @@ async function loadAllMetricsData(metricsDir: string): Promise<{
   const dataByDate: Record<string, Record<string, string>[]> = {};
   let latestFile: string | undefined = undefined;
   let error: string | undefined = undefined;
-
   try {
     const files = await fs.readdir(metricsDir);
     const csvFiles = files
-      .filter(file => file.startsWith("metrics-") && file.endsWith(".csv"))
-      .sort(); // 時系列順にソート
-
+      .filter((file) => file.startsWith("metrics-") && file.endsWith(".csv"))
+      .sort();
     if (csvFiles.length === 0) {
       return { dataByDate, error: "メトリクスファイルが見つかりません。" };
     }
-
-    latestFile = csvFiles[csvFiles.length - 1]; // 最後が最新
-
+    latestFile = csvFiles[csvFiles.length - 1];
     for (const file of csvFiles) {
       const date = extractDateFromFilename(file);
-      if (!date) continue; // 日付が抽出できなければスキップ
-
+      if (!date) continue;
       const filePath = path.join(metricsDir, file);
       const fileResult = await readFileContent(filePath);
-
       if (fileResult.error) {
-        // 個別ファイルのエラーはログに出力するが、全体のエラーとはしない
         console.warn(`Warning reading ${file}: ${fileResult.error}`);
         continue;
       }
@@ -79,49 +76,26 @@ async function loadAllMetricsData(metricsDir: string): Promise<{
     console.error("Error accessing metrics directory:", err);
     error = "メトリクスデータの読み込み中にエラーが発生しました。";
   }
-
   return { dataByDate, error, latestFile };
 }
 
-// 文字列から色を生成する簡易的な関数 (ハッシュベース)
-function stringToColor(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  let color = '#';
-  for (let i = 0; i < 3; i++) {
-    const value = (hash >> (i * 8)) & 0xFF;
-    color += ('00' + value.toString(16)).substr(-2);
-  }
-  // 色が見やすいように少し調整 (例: 明るさを確保)
-  // より洗練された方法もありますが、ここではシンプルにします
-  const r = parseInt(color.substring(1, 3), 16);
-  const g = parseInt(color.substring(3, 5), 16);
-  const b = parseInt(color.substring(5, 7), 16);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  if (brightness < 128) { // 暗すぎる場合は少し明るくする (例)
-     // 簡単な例: #808080 に近づける (より良い方法は検討可能)
-     return `#${(0x80 + Math.floor(r/2)).toString(16).padStart(2, '0')}${(0x80 + Math.floor(g/2)).toString(16).padStart(2, '0')}${(0x80 + Math.floor(b/2)).toString(16).padStart(2, '0')}`;
-  }
-  return color;
-}
+// stringToColor is only needed for chart, can be removed or kept for later
+// function stringToColor(...) { /* ... */ }
 
-// allMetricsData を Recharts 用のデータ形式に変換する関数
-function transformDataForChart(dataByDate: Record<string, Record<string, string>[]>): {
+function transformDataForChart(
+  dataByDate: Record<string, Record<string, string>[]>,
+): {
   chartData: { date: string; [ruleId: string]: number | string }[];
   ruleIds: string[];
 } {
   const chartData: { date: string; [ruleId: string]: number | string }[] = [];
   const ruleIdSet = new Set<string>();
-
-  // 日付順にソートして処理
   const sortedDates = Object.keys(dataByDate).sort();
-
   for (const date of sortedDates) {
     const dailyData = dataByDate[date];
-    const chartEntry: { date: string; [ruleId: string]: number | string } = { date };
-
+    const chartEntry: { date: string; [ruleId: string]: number | string } = {
+      date,
+    };
     for (const ruleData of dailyData) {
       if (ruleData["Rule ID"] && ruleData["Score"]) {
         const ruleId = ruleData["Rule ID"];
@@ -134,23 +108,21 @@ function transformDataForChart(dataByDate: Record<string, Record<string, string>
     }
     chartData.push(chartEntry);
   }
-
   return { chartData, ruleIds: Array.from(ruleIdSet) };
 }
 
-// 最新のヒント Markdown ファイルを読み込む関数
-async function loadLatestHintContent(metricsDir: string): Promise<{ content: string; error?: string; filename?: string }> {
+async function loadLatestHintContent(
+  metricsDir: string,
+): Promise<{ content: string; error?: string; filename?: string }> {
   let filename: string | undefined = undefined;
   let content: string = "";
   let error: string | undefined = undefined;
-
   try {
     const files = await fs.readdir(metricsDir);
     const hintFiles = files
-      .filter(file => file.startsWith("_hints-") && file.endsWith(".md"))
+      .filter((file) => file.startsWith("_hints-") && file.endsWith(".md"))
       .sort()
-      .reverse(); // 最新ファイルを先頭に
-
+      .reverse();
     if (hintFiles.length > 0) {
       filename = hintFiles[0];
       const hintFilePath = path.join(metricsDir, filename);
@@ -161,177 +133,94 @@ async function loadLatestHintContent(metricsDir: string): Promise<{ content: str
         content = hintResult.content;
       }
     } else {
-      // ヒントファイルがなくてもエラーとはしない
       content = "利用可能なヒントはありません。";
     }
   } catch (err) {
     console.error("Error accessing metrics directory for hints:", err);
     error = "ヒントファイルの読み込み中にエラーが発生しました。";
   }
-
   return { content, error, filename };
 }
 
 export default async function Home() {
-  // プロジェクトルートからの相対パス
-  const contentDir = path.join(process.cwd(), "src", "content"); // コンテンツディレクトリのベースパス
-  const rulesDir = path.join(contentDir, "rules"); // ルールコンテンツディレクトリ
-  const metricsDir = path.join(contentDir, "metrics"); // メトリクスコンテンツディレクトリ
-  const readmePath = path.join(rulesDir, "README.md");
-  const techStackPath = path.join(rulesDir, "tech-stack.md"); // ファイル名を変更
+  // Fetch and process data
+  const readmePath = path.join(process.cwd(), "README.md");
+  // const techStackPath = path.join(process.cwd(), "docs", "tech_stack.md"); // Old path
+  const techStackPath = path.join(process.cwd(), "src", "content", "rules", "tech-stack.md"); // Corrected path
+  // const metricsDir = path.join(process.cwd(), "data", "metrics"); // Old path
+  const metricsDir = path.join(process.cwd(), "src", "content", "metrics"); // Corrected path
+  // const manualInsightsPath = path.join( // Removed
+  //   process.cwd(),
+  //   "docs",
+  //   "manual_insights.md",
+  // );
+  // const linksPath = path.join(process.cwd(), "docs", "links.md"); // Removed
 
-  // 全メトリクスデータを読み込む
-  const { dataByDate: allMetricsData, error: errorLoadingMetrics, latestFile: latestMetricsFile } = await loadAllMetricsData(metricsDir);
+  const [readmeResult, techStackResult, metricsResult, hintResult] =
+    await Promise.all([
+      readFileContent(readmePath),
+      readFileContent(techStackPath),
+      loadAllMetricsData(metricsDir),
+      loadLatestHintContent(metricsDir),
+      // readFileContent(manualInsightsPath), // Removed as file doesn't exist
+      // readFileContent(linksPath), // Removed as file doesn't exist
+    ]);
 
-  // 最新のメトリクスデータを取得 (存在すれば)
-  const latestMetricsData = latestMetricsFile && allMetricsData[extractDateFromFilename(latestMetricsFile) || '']
-    ? allMetricsData[extractDateFromFilename(latestMetricsFile) || '']
-    : [];
+  const readmeContent = readmeResult.content;
+  const readmeError = readmeResult.error;
+  const techStackContent = techStackResult.content;
+  const techStackError = techStackResult.error;
+  const {
+    dataByDate,
+    error: metricsError,
+    latestFile: latestMetricsFile,
+  } = metricsResult;
+  const latestMetricsData =
+    latestMetricsFile &&
+    dataByDate[extractDateFromFilename(latestMetricsFile) ?? ""]
+      ? dataByDate[extractDateFromFilename(latestMetricsFile) ?? ""]
+      : [];
+  const latestHintContent = hintResult.content;
+  const hintError = hintResult.error;
+  const latestHintFilename = hintResult.filename;
+  // const manualInsightsContent = manualInsightsResult.content; // Removed
+  // const manualInsightsError = manualInsightsResult.error; // Removed
+  // const linksContent = linksResult.content; // Removed
+  // const linksError = linksResult.error; // Removed
 
-  // グラフ用データ整形
-  const { chartData, ruleIds } = transformDataForChart(allMetricsData);
-  const chartLines = ruleIds.map(id => ({ key: id, color: stringToColor(id) }));
+  // Process markdown content
+  const readmeHtml = readmeContent ? await marked(readmeContent) : "";
+  const techStackHtml = techStackContent ? await marked(techStackContent) : "";
+  const hintHtml = latestHintContent ? await marked(latestHintContent) : "";
+  // const manualInsightsHtml = manualInsightsContent ? await marked(manualInsightsContent) : ""; // Removed
+  // const linksHtml = linksContent ? await marked(linksContent) : ""; // Removed
 
-  // ルールファイルと最新ヒントを並列読み込み
-  const [readmeResult, techStackResult, hintResult] = await Promise.all([
-    readFileContent(readmePath),
-    readFileContent(techStackPath),
-    loadLatestHintContent(metricsDir), // 最新ヒントを読み込む
-  ]);
-
-  // markedでMarkdownをHTMLに変換 (エラーや空の場合を考慮)
-  const readmeHtml = readmeResult.content ? marked(readmeResult.content) : ''; // 空文字列をデフォルトに
-  const techStackHtml = techStackResult.content ? marked(techStackResult.content) : ''; // 空文字列をデフォルトに
-  const hintHtml = hintResult.content ? marked(hintResult.content) : ''; // 空文字列をデフォルトに
+  // Prepare chart data (assuming chart display is commented out in PageContent)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { chartData, ruleIds } = transformDataForChart(dataByDate);
+  // const chartLines = ruleIds.map((id) => ({ // Keep commented out if chart is not displayed
+  //   id: id,
+  //   color: "hsl(0, 0%, 50%)", // Use default color or keep stringToColor commented
+  // }));
 
   return (
-    <Container className="my-4">
-      <h1>Cursor Rule Metrics</h1>
-
-      {/* README Section - Ensure content exists before rendering */} 
-      <Card className="mb-4">
-        <Card.Header>ルールの概要 (README)</Card.Header>
-        <Card.Body>
-          {readmeResult.error ? (
-            <p className="text-danger">{readmeResult.error}</p>
-          ) : readmeHtml ? (
-            <div dangerouslySetInnerHTML={{ __html: readmeHtml }} />
-          ) : (
-            <p>コンテンツがありません。</p> // Fallback for empty content
-          )}
-        </Card.Body>
-      </Card>
-
-      {/* Tech Stack Section - Ensure content exists */} 
-      <Card className="mb-4">
-        <Card.Header>技術スタックルール (tech-stack.md)</Card.Header>
-        <Card.Body>
-          {techStackResult.error ? (
-            <p className="text-danger">{techStackResult.error}</p>
-          ) : techStackHtml ? (
-            <div dangerouslySetInnerHTML={{ __html: techStackHtml }} />
-          ) : (
-            <p>コンテンツがありません。</p>
-          )}
-        </Card.Body>
-      </Card>
-
-      {/* Metrics Table Section - Ensure data exists */} 
-      <Card className="mb-4">
-        <Card.Header>最新メトリクス ({latestMetricsFile || "N/A"})</Card.Header>
-        <Card.Body>
-          {errorLoadingMetrics ? (
-            <p className="text-danger">{errorLoadingMetrics}</p>
-          ) : latestMetricsData && latestMetricsData.length > 0 ? ( // Check data existence more strictly
-            <Table striped bordered hover responsive size="sm">
-              <thead>
-                <tr>
-                  {Object.keys(latestMetricsData[0]).map(key => (
-                    <th key={key}>{key}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {latestMetricsData.map((row, index) => (
-                  <tr key={index}>
-                    {Object.values(row).map((value, i) => (
-                      <td key={i}>{value}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : (
-            <p>表示するメトリクスデータがありません。</p>
-          )}
-        </Card.Body>
-      </Card>
-
-      {/* Metrics Chart Section - Ensure data exists */} 
-      <Card className="mb-4">
-        <Card.Header>メトリクス推移</Card.Header>
-        <Card.Body>
-          {errorLoadingMetrics ? (
-            <p className="text-danger">{errorLoadingMetrics}</p>
-          ) : chartData && chartData.length > 0 && chartLines && chartLines.length > 0 ? ( // Check data existence
-            // <ChartLoader data={chartData} lines={chartLines} />
-            <p>テスト: グラフ表示箇所</p> // Replace ChartLoader with simple text
-          ) : (
-            <p>グラフを表示するためのデータがありません。</p>
-          )}
-        </Card.Body>
-      </Card>
-      
-      {/* Hints Section - Ensure content exists */} 
-      <Card className="mb-4">
-        <Card.Header>スコア変動要因ヒント ({hintResult.filename || "N/A"})</Card.Header>
-        <Card.Body>
-          {hintResult.error ? (
-            <p className="text-danger">{hintResult.error}</p>
-          ) : hintHtml ? (
-            <div dangerouslySetInnerHTML={{ __html: hintHtml }} />
-          ) : (
-            <p>利用可能なヒントはありません。</p> // Updated fallback message
-          )}
-        </Card.Body>
-      </Card>
-
-      {/* Manual Insights Section - No data dependency here */}
-      <Card className="mb-4">
-        <Card.Header>考察 (手動追記)</Card.Header>
-        <Card.Body>
-          <p>ここに手動での考察やコメントが追記されます。(TBD)</p>
-          <p><em>(編集機能は未実装です)</em></p>
-        </Card.Body>
-      </Card>
-
-      {/* Links Section - No data dependency here */}
-      <Card className="mb-4">
-        <Card.Header>関連リンク</Card.Header>
-        <Card.Body>
-          {/* TODO: 正しいリポジトリ URL に置き換える */}
-          <p>
-            <a
-              href="https://github.com/your-username/your-repo-name"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              GitHub リポジトリ
-            </a>
-          </p>
-          {/* TODO: 正しい Issues URL に置き換える */}
-          <p>
-            <a
-              href="https://github.com/your-username/your-repo-name/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              フィードバックはこちら (GitHub Issues)
-            </a>
-          </p>
-        </Card.Body>
-      </Card>
-
-    </Container>
+    <PageContent
+      readmeHtml={readmeHtml}
+      readmeError={readmeError}
+      techStackHtml={techStackHtml}
+      techStackError={techStackError}
+      latestMetricsData={latestMetricsData}
+      metricsError={metricsError}
+      latestMetricsFile={latestMetricsFile}
+      // chartData={chartData} // Pass chartData if/when chart is re-enabled
+      // chartLines={chartLines} // Pass chartLines if/when chart is re-enabled
+      hintHtml={hintHtml}
+      hintError={hintError}
+      hintFilename={latestHintFilename}
+      // manualInsightsHtml={manualInsightsHtml} // Removed
+      // manualInsightsError={manualInsightsError} // Removed
+      // linksHtml={linksHtml} // Removed
+      // linksError={linksError} // Removed
+    />
   );
 }
