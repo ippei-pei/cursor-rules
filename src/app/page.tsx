@@ -200,101 +200,103 @@ export default async function Home() {
     loadLatestHintContent(metricsDir), // 最新ヒントを読み込む
   ]);
 
-  // markedでMarkdownをHTMLに変換
-  const readmeHtml = marked(readmeResult.content);
-  const techStackHtml = marked(techStackResult.content);
-  const hintHtml = marked(hintResult.content); // ヒントもHTMLに変換
+  // markedでMarkdownをHTMLに変換 (エラーや空の場合を考慮)
+  const readmeHtml = readmeResult.content ? marked(readmeResult.content) : ''; // 空文字列をデフォルトに
+  const techStackHtml = techStackResult.content ? marked(techStackResult.content) : ''; // 空文字列をデフォルトに
+  const hintHtml = hintResult.content ? marked(hintResult.content) : ''; // 空文字列をデフォルトに
 
   return (
     <Container className="my-4">
       <h1>Cursor Rule Metrics</h1>
 
+      {/* README Section - Ensure content exists before rendering */} 
       <Card className="mb-4">
         <Card.Header>ルールの概要 (README)</Card.Header>
         <Card.Body>
           {readmeResult.error ? (
             <p className="text-danger">{readmeResult.error}</p>
-          ) : (
+          ) : readmeHtml ? (
             <div dangerouslySetInnerHTML={{ __html: readmeHtml }} />
+          ) : (
+            <p>コンテンツがありません。</p> // Fallback for empty content
           )}
         </Card.Body>
       </Card>
 
+      {/* Tech Stack Section - Ensure content exists */} 
       <Card className="mb-4">
         <Card.Header>技術スタックルール (tech-stack.md)</Card.Header>
         <Card.Body>
           {techStackResult.error ? (
             <p className="text-danger">{techStackResult.error}</p>
-          ) : (
+          ) : techStackHtml ? (
             <div dangerouslySetInnerHTML={{ __html: techStackHtml }} />
+          ) : (
+            <p>コンテンツがありません。</p>
           )}
         </Card.Body>
       </Card>
 
-      {/* 最新メトリクスセクション */}
+      {/* Metrics Table Section - Ensure data exists */} 
       <Card className="mb-4">
         <Card.Header>最新メトリクス ({latestMetricsFile || "N/A"})</Card.Header>
         <Card.Body>
           {errorLoadingMetrics ? (
             <p className="text-danger">{errorLoadingMetrics}</p>
-          ) : (
-            latestMetricsData.length === 0 ? (
-              <p>表示するメトリクスデータがありません。</p>
-            ) : (
-              <Table striped bordered hover responsive size="sm">
-                <thead>
-                  <tr>
-                    {/* ヘッダー行: latestMetricsDataの最初の要素のキーを使用 */}
-                    {Object.keys(latestMetricsData[0]).map(key => (
-                      <th key={key}>{key}</th>
+          ) : latestMetricsData && latestMetricsData.length > 0 ? ( // Check data existence more strictly
+            <Table striped bordered hover responsive size="sm">
+              <thead>
+                <tr>
+                  {Object.keys(latestMetricsData[0]).map(key => (
+                    <th key={key}>{key}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {latestMetricsData.map((row, index) => (
+                  <tr key={index}>
+                    {Object.values(row).map((value, i) => (
+                      <td key={i}>{value}</td>
                     ))}
                   </tr>
-                </thead>
-                <tbody>
-                  {/* データ行: latestMetricsDataをマップして表示 */}
-                  {latestMetricsData.map((row, index) => (
-                    <tr key={index}>
-                      {Object.values(row).map((value, i) => (
-                        <td key={i}>{value}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            )
+                ))}
+              </tbody>
+            </Table>
+          ) : (
+            <p>表示するメトリクスデータがありません。</p>
           )}
         </Card.Body>
       </Card>
 
-           {/* メトリクス推移グラフセクション (Task 2.1.2 で実装) */}
-           <Card className="mb-4">
+      {/* Metrics Chart Section - Ensure data exists */} 
+      <Card className="mb-4">
         <Card.Header>メトリクス推移</Card.Header>
         <Card.Body>
           {errorLoadingMetrics ? (
             <p className="text-danger">{errorLoadingMetrics}</p>
+          ) : chartData && chartData.length > 0 && chartLines && chartLines.length > 0 ? ( // Check data existence
+            <ChartLoader data={chartData} lines={chartLines} />
           ) : (
-            Object.keys(allMetricsData).length === 0 ? (
-              <p>グラフを表示するためのデータがありません。</p>
-            ) : (
-              <ChartLoader data={chartData} lines={chartLines} />
-            )
+            <p>グラフを表示するためのデータがありません。</p>
           )}
         </Card.Body>
       </Card>
-
-      {/* スコア変動要因ヒントセクション */}
+      
+      {/* Hints Section - Ensure content exists */} 
       <Card className="mb-4">
         <Card.Header>スコア変動要因ヒント ({hintResult.filename || "N/A"})</Card.Header>
         <Card.Body>
           {hintResult.error ? (
             <p className="text-danger">{hintResult.error}</p>
-          ) : (
+          ) : hintHtml ? (
             <div dangerouslySetInnerHTML={{ __html: hintHtml }} />
+          ) : (
+            <p>利用可能なヒントはありません。</p> // Updated fallback message
           )}
         </Card.Body>
       </Card>
 
-      {/* 手動考察セクション */}
+      {/* Manual Insights Section - No data dependency here */}
       <Card className="mb-4">
         <Card.Header>考察 (手動追記)</Card.Header>
         <Card.Body>
@@ -303,15 +305,7 @@ export default async function Home() {
         </Card.Body>
       </Card>
 
-      {/* 設計思想/全体像セクション */}
-      <Card className="mb-4">
-        <Card.Header>設計思想 / 全体像</Card.Header>
-        <Card.Body>
-          <p>ここにルールの設計思想や全体像に関する説明が入ります。(TBD)</p>
-        </Card.Body>
-      </Card>
-
-      {/* 関連リンク セクション */}
+      {/* Links Section - No data dependency here */}
       <Card className="mb-4">
         <Card.Header>関連リンク</Card.Header>
         <Card.Body>
@@ -319,9 +313,9 @@ export default async function Home() {
           <p>
             <a
               href="https://github.com/your-username/your-repo-name"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               GitHub リポジトリ
             </a>
           </p>
@@ -329,16 +323,15 @@ export default async function Home() {
           <p>
             <a
               href="https://github.com/your-username/your-repo-name/issues"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               フィードバックはこちら (GitHub Issues)
             </a>
           </p>
         </Card.Body>
       </Card>
 
-      {/* 他のセクションはここに追加していきます */}
     </Container>
   );
 }
